@@ -149,6 +149,9 @@ public class AuthenticationManager {
     // clientSession note with flag that clientSession was authenticated through SSO cookie
     public static final String SSO_AUTH = "SSO_AUTH";
 
+    // authSession note with flag that is true if user is authenticated through read-only user backend (e.g. read-only LDAP)
+    public static final String USER_READ_ONLY = "USER_READ_ONLY";
+
     // authSession note with flag that is true if user is forced to re-authenticate by client (EG. in case of OIDC client by sending "prompt=login")
     public static final String FORCED_REAUTHENTICATION = "FORCED_REAUTHENTICATION";
 

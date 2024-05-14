@@ -55,6 +55,7 @@ import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.LDAPConstants;
 import org.keycloak.models.ModelDuplicateException;
 import org.keycloak.models.ModelException;
+import org.keycloak.models.PasswordPolicy;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.RequiredActionProviderModel;
 import org.keycloak.models.RoleModel;
@@ -68,6 +69,7 @@ import org.keycloak.models.utils.ReadOnlyUserModelDelegate;
 import org.keycloak.policy.PasswordPolicyManagerProvider;
 import org.keycloak.policy.PolicyError;
 import org.keycloak.models.cache.UserCache;
+import org.keycloak.services.managers.AuthenticationManager;
 import org.keycloak.storage.DatastoreProvider;
 import org.keycloak.storage.StoreManagers;
 import org.keycloak.storage.ReadOnlyException;
@@ -886,7 +888,27 @@ public class LDAPStorageProvider implements UserStorageProvider,
     public boolean isValid(RealmModel realm, UserModel user, CredentialInput input) {
         if (!(input instanceof UserCredentialModel)) return false;
         if (input.getType().equals(PasswordCredentialModel.TYPE) && !((UserCredentialManager) user.credentialManager()).isConfiguredLocally(PasswordCredentialModel.TYPE)) {
-            return validPassword(realm, user, input.getChallengeResponse());
+            if(getEditMode() == EditMode.READ_ONLY) {
+                session.getContext().getAuthenticationSession().setAuthNote(AuthenticationManager.USER_READ_ONLY, "true");
+            }
+
+            if(!validPassword(realm, user, input.getChallengeResponse())){
+                return false;
+            }
+
+            // After the password has been validated successfully, check that it still matches the realm's password policy.
+            // Only do that, if we can write the LDAP store, since only then the password can be updated in Keycloak.
+            // TODO: Do we want to support read-only LDAP? How to handle this then? Leave the decision to whoever evaluates the
+            // password policy result, so e.g. show a warning in the browser authenticators / deny authentication?
+            if (ldapIdentityStore.getConfig().isValidatePasswordPolicy() && realm.getPasswordPolicy().shouldValidateOnLogin()) {
+                PolicyError error = session.getProvider(PasswordPolicyManagerProvider.class).validate(realm, user, input.getChallengeResponse());
+                if (error != null) {
+                    logger.debug("User password no longer matches password policy");
+                    session.getContext().getAuthenticationSession().setAuthNote(PasswordPolicy.POLICY_ERROR_AUTH_NOTE, "true");
+                    return false;
+                }
+            }
+            return true;
         } else {
             return false; // invalid cred type
         }

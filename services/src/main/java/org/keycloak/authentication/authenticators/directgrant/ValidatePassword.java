@@ -19,6 +19,7 @@ package org.keycloak.authentication.authenticators.directgrant;
 
 import org.keycloak.authentication.AuthenticationFlowContext;
 import org.keycloak.authentication.AuthenticationFlowError;
+import org.keycloak.authentication.AuthenticatorUtil;
 import org.keycloak.events.Errors;
 import org.keycloak.models.AuthenticationExecutionModel;
 import org.keycloak.models.KeycloakSession;
@@ -54,6 +55,17 @@ public class ValidatePassword extends AbstractDirectGrantAuthenticator {
             context.failure(AuthenticationFlowError.INVALID_USER, challengeResponse);
             return;
         }
+
+        if (AuthenticatorUtil.hasPasswordPolicyError(context.getAuthenticationSession())) {
+            Response challengeResponse = errorResponse(
+                    Response.Status.UNAUTHORIZED.getStatusCode(),
+                    "invalid_grant",
+                    "User password no longer matches the password policy and must be changed"
+            );
+            context.failure(AuthenticationFlowError.INVALID_USER, challengeResponse);
+            return;
+        }
+
         context.getAuthenticationSession().setAuthNote(AuthenticationManager.PASSWORD_VALIDATED, "true");
         context.success();
     }

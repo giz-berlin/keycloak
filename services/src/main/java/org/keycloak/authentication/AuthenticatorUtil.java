@@ -32,6 +32,7 @@ import org.keycloak.models.AuthenticationExecutionModel;
 import org.keycloak.models.AuthenticationFlowModel;
 import org.keycloak.models.Constants;
 import org.keycloak.models.KeycloakSession;
+import org.keycloak.models.PasswordPolicy;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserModel;
 import org.keycloak.services.managers.AuthenticationManager;
@@ -49,6 +50,7 @@ import java.util.stream.Stream;
 
 import static org.keycloak.services.managers.AuthenticationManager.FORCED_REAUTHENTICATION;
 import static org.keycloak.services.managers.AuthenticationManager.SSO_AUTH;
+import static org.keycloak.services.managers.AuthenticationManager.USER_READ_ONLY;
 import static org.keycloak.services.managers.AuthenticationManager.PASSWORD_VALIDATED;
 
 public class AuthenticatorUtil {
@@ -63,6 +65,10 @@ public class AuthenticatorUtil {
         return "true".equals(authSession.getAuthNote(SSO_AUTH));
     }
 
+    public static boolean isUserReadOnlyAuthentication(AuthenticationSessionModel authSession) {
+        return "true".equals(authSession.getAuthNote(USER_READ_ONLY));
+    }
+
     public static boolean isForcedReauthentication(AuthenticationSessionModel authSession) {
         return "true".equals(authSession.getAuthNote(FORCED_REAUTHENTICATION));
     }
@@ -73,6 +79,10 @@ public class AuthenticatorUtil {
 
     public static boolean isForkedFlow(AuthenticationSessionModel authSession) {
         return authSession.getAuthNote(AuthenticationProcessor.FORKED_FROM) != null;
+    }
+
+    public static boolean hasPasswordPolicyError(AuthenticationSessionModel authSession) {
+        return "true".equals(authSession.getAuthNote(PasswordPolicy.POLICY_ERROR_AUTH_NOTE));
     }
 
     /**

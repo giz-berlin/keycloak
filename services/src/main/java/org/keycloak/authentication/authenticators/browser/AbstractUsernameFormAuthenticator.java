@@ -22,6 +22,7 @@ import org.keycloak.authentication.AbstractFormAuthenticator;
 import org.keycloak.authentication.AuthenticationFlowContext;
 import org.keycloak.authentication.AuthenticationFlowError;
 import org.keycloak.authentication.authenticators.util.AuthenticatorUtils;
+import org.keycloak.authentication.AuthenticatorUtil;
 import org.keycloak.events.Details;
 import org.keycloak.events.Errors;
 import org.keycloak.forms.login.LoginFormsProvider;
@@ -196,6 +197,29 @@ public abstract class AbstractUsernameFormAuthenticator extends AbstractFormAuth
     }
 
     public boolean validatePassword(AuthenticationFlowContext context, UserModel user, MultivaluedMap<String, String> inputData, boolean clearUser) {
+        // If we have validated the password before, but it didn't match the current password policy, allow to continue to
+        // update the password or cancel. If we don't check whether the password was validated, users could skip the authenticator simply
+        // by providing continueUpdate in their form data.
+        if (AuthenticatorUtil.isPasswordValidated(context.getAuthenticationSession())){
+            // Offer the option to update the password if user hit continue, and they are not read-only.
+            if(inputData.containsKey("continueToUpdate") && !AuthenticatorUtil.isUserReadOnlyAuthentication(context.getAuthenticationSession())) {
+                // Set a required action on the authentication session instead of on the user, as the password policy could be
+                // changed again such that the password would be compliant again. Setting an update action on the user could
+                // make it redundant, if their password is compliant again after a change in the policy.
+                context.getAuthenticationSession().addRequiredAction(UserModel.RequiredAction.UPDATE_PASSWORD);
+                return true;
+            }
+
+            // Otherwise, go back to the login field.
+            Response challengeResponse = challenge(context, getDefaultChallengeMessage(context), FIELD_PASSWORD);
+            context.forceChallenge(challengeResponse);
+
+            if (clearUser) {
+                context.clearUser();
+            }
+            return false;
+        }
+
         String password = inputData.getFirst(CredentialRepresentation.PASSWORD);
         if (password == null || password.isEmpty()) {
             return badPasswordHandler(context, user, clearUser,true);
@@ -205,6 +229,22 @@ public abstract class AbstractUsernameFormAuthenticator extends AbstractFormAuth
 
         if (password != null && !password.isEmpty() && user.credentialManager().isValid(UserCredentialModel.password(password))) {
             context.getAuthenticationSession().setAuthNote(AuthenticationManager.PASSWORD_VALIDATED, "true");
+
+            // The credentialManager doesn't return policy errors for us. Instead, the individual credential providers that
+            // validate the password set this flag to true if there is an error.
+            if (AuthenticatorUtil.hasPasswordPolicyError(context.getAuthenticationSession())) {
+                // TODO: Pass read-only state to form.
+
+                Response challenge = context.
+                        form().
+                        setAttribute("userReadOnly", AuthenticatorUtil.isUserReadOnlyAuthentication(context.getAuthenticationSession())).
+                        createForm("login-policy-error.ftl");
+
+                context.forceChallenge(challenge);
+
+                return false;
+            }
+
             return true;
         } else {
             return badPasswordHandler(context, user, clearUser,false);
