@@ -47,6 +47,10 @@ public class PasswordPolicy implements Serializable {
 
     public static final String PASSWORD_AGE = "passwordAge";
 
+    public static final String VALIDATE_ON_LOGIN_ID = "validateOnLogin";
+
+    public static final String POLICY_ERROR_AUTH_NOTE = "POLICY_ERROR";
+
     private Map<String, Object> policyConfig;
     private Builder builder;
 
@@ -141,6 +145,10 @@ public class PasswordPolicy implements Serializable {
         } else {
             return -1;
         }
+    }
+
+    public boolean shouldValidateOnLogin() {
+        return policyConfig.containsKey(VALIDATE_ON_LOGIN_ID);
     }
 
     @Override

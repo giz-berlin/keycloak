@@ -206,6 +206,15 @@ public class PasswordCredentialProvider implements CredentialProvider<PasswordCr
             return false;
         }
 
+        if (realm.getPasswordPolicy().shouldValidateOnLogin()){
+            // After the password has been validated successfully, check that it still matches the realm's password policy.
+            PolicyError error = session.getProvider(PasswordPolicyManagerProvider.class).validate(realm, user, input.getChallengeResponse());
+            if (error != null) {
+                logger.debug("User password no longer matches password policy");
+                session.getContext().getAuthenticationSession().setAuthNote(PasswordPolicy.POLICY_ERROR_AUTH_NOTE, "true");
+            }
+        }
+
         return true;
     }
 
